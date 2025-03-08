@@ -6,9 +6,9 @@ const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
 const MongoStore = require('connect-mongo');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const authRoutes = require('./routes/auth');
 const User = require('./models/User');
+require('./config/passport'); // Ensure Passport configuration is loaded
 
 const app = express();
 app.use(bodyParser.json());
@@ -30,7 +30,7 @@ const connectDB = async () => {
 
 connectDB();
 
-// ✅ Add session middleware
+// Add session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "my_secret_key",
@@ -41,49 +41,11 @@ app.use(
   })
 );
 
-// ✅ Initialize Passport
+// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ✅ Google OAuth Strategy
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:3000/api/auth/google/callback", // Ensure this matches Google Cloud Console
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      const { displayName, emails } = profile;
-      const email = emails[0].value;
-      try {
-        let user = await User.findOne({ email });
-        if (!user) {
-          user = new User({ username: displayName, email });
-          await user.save();
-        }
-        return done(null, user);
-      } catch (error) {
-        return done(error, null);
-      }
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (error) {
-    done(error, null);
-  }
-});
-
-// ✅ Routes
+// Routes
 app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
